@@ -30,7 +30,18 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getClaims();
+  const { data, error } = await supabase.auth.getClaims();
+
+  if (request.nextUrl.pathname.startsWith("/dashboard")) {
+    console.info("[supabase-session]", {
+      operation: "proxy_get_claims",
+      userExists: Boolean(data?.claims?.sub),
+      userId: data?.claims?.sub ?? null,
+      role: data?.claims?.role ?? null,
+      errorCode: error?.code ?? null,
+      errorMessage: error?.message ?? null,
+    });
+  }
 
   return response;
 }
