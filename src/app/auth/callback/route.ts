@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createAuthRouteClient } from "@/lib/supabase/auth-route";
 
 function getLoginErrorRedirect(request: NextRequest) {
   const redirectUrl = new URL("/login", request.url);
@@ -11,18 +11,22 @@ function getLoginErrorRedirect(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   const flowId = request.nextUrl.searchParams.get("sb_flow_id");
-
-  const supabase = await createClient();
+  const response = NextResponse.redirect(getLoginErrorRedirect(request));
+  const supabase = createAuthRouteClient(request, response);
 
   if (code) {
     try {
-      const { error } = await supabase.auth.exchangeCodeForSession(
+      const { data, error } = await supabase.auth.exchangeCodeForSession(
         code,
         flowId ? { flowId } : undefined,
       );
 
-      if (!error) {
-        return NextResponse.redirect(new URL("/dashboard", request.url));
+      if (!error && data.session && data.user) {
+        response.headers.set(
+          "Location",
+          new URL("/dashboard", request.url).toString(),
+        );
+        return response;
       }
     } catch {
       // Fall through and accept only an independently verified existing session.
@@ -30,14 +34,18 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { data, error } = await supabase.auth.getClaims();
+    const { data, error } = await supabase.auth.getUser();
 
-    if (!error && data?.claims?.sub) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+    if (!error && data.user) {
+      response.headers.set(
+        "Location",
+        new URL("/dashboard", request.url).toString(),
+      );
+      return response;
     }
   } catch {
     // Missing or invalid sessions use the same safe login error below.
   }
 
-  return NextResponse.redirect(getLoginErrorRedirect(request));
+  return response;
 }
