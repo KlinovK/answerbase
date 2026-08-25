@@ -8,22 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { createClient } from "@/lib/supabase/server";
 
-const AUTH_DEBUG_TAG = "[auth-first-request-debug]";
-
 export default async function DashboardLayout({
   children,
 }: LayoutProps<"/dashboard">) {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
-
-  console.info(AUTH_DEBUG_TAG, {
-    stage: "dashboard_layout_user_verification",
-    pathname: "/dashboard",
-    userExists: Boolean(data?.claims?.sub),
-    userId: data?.claims?.sub ?? null,
-    authErrorCode: error?.code ?? null,
-    authErrorMessage: error?.message ?? null,
-  });
 
   if (error || !data?.claims) {
     redirect("/login");
