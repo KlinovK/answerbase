@@ -17,6 +17,8 @@ import {
 } from "@/lib/plans";
 import { createClient } from "@/lib/supabase/server";
 
+const AUTH_DEBUG_TAG = "[auth-first-request-debug]";
+
 const createdDateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
@@ -33,6 +35,15 @@ export default async function DashboardPage({
   const { data: authData, error: authError } = await supabase.auth.getClaims();
   const userId = authData?.claims?.sub;
 
+  console.info(AUTH_DEBUG_TAG, {
+    stage: "dashboard_page_user_verification",
+    pathname: "/dashboard",
+    userExists: Boolean(userId),
+    userId: userId ?? null,
+    authErrorCode: authError?.code ?? null,
+    authErrorMessage: authError?.message ?? null,
+  });
+
   if (authError || !userId) {
     redirect("/login");
   }
@@ -46,7 +57,40 @@ export default async function DashboardPage({
     supabase.from("profiles").select("plan").eq("id", userId).single(),
   ]);
 
+  const profilePlan = profileResult.data?.plan ?? null;
+  const profilePlanIsValid = profilePlan ? isPlan(profilePlan) : false;
+
+  console.info(AUTH_DEBUG_TAG, {
+    stage: "dashboard_data_queries",
+    pathname: "/dashboard",
+    userId,
+    chatbotsQuerySucceeded: !chatbotsResult.error,
+    chatbotRowCount: chatbotsResult.data?.length ?? null,
+    chatbotsErrorCode: chatbotsResult.error?.code ?? null,
+    chatbotsErrorMessage: chatbotsResult.error?.message ?? null,
+    chatbotsHttpStatus: chatbotsResult.status,
+    profileQuerySucceeded: !profileResult.error,
+    profileRowFound: Boolean(profileResult.data),
+    profilePlan,
+    profilePlanIsValid,
+    profileErrorCode: profileResult.error?.code ?? null,
+    profileErrorMessage: profileResult.error?.message ?? null,
+    profileErrorDetails: profileResult.error?.details ?? null,
+    profileErrorHint: profileResult.error?.hint ?? null,
+    profileHttpStatus: profileResult.status,
+  });
+
   if (chatbotsResult.error) {
+    console.error(AUTH_DEBUG_TAG, {
+      stage: "dashboard_chatbots_error_before_throw",
+      pathname: "/dashboard",
+      userId,
+      errorCode: chatbotsResult.error.code,
+      errorMessage: chatbotsResult.error.message,
+      errorDetails: chatbotsResult.error.details,
+      errorHint: chatbotsResult.error.hint,
+      httpStatus: chatbotsResult.status,
+    });
     throw new Error("Unable to load chatbots.");
   }
 
@@ -55,6 +99,19 @@ export default async function DashboardPage({
     !profileResult.data ||
     !isPlan(profileResult.data.plan)
   ) {
+    console.error(AUTH_DEBUG_TAG, {
+      stage: "dashboard_profile_error_before_throw",
+      pathname: "/dashboard",
+      userId,
+      profileRowFound: Boolean(profileResult.data),
+      profilePlan,
+      profilePlanIsValid,
+      errorCode: profileResult.error?.code ?? null,
+      errorMessage: profileResult.error?.message ?? null,
+      errorDetails: profileResult.error?.details ?? null,
+      errorHint: profileResult.error?.hint ?? null,
+      httpStatus: profileResult.status,
+    });
     throw new Error("Unable to load the current plan.");
   }
 
@@ -62,6 +119,14 @@ export default async function DashboardPage({
   const plan = profileResult.data.plan;
   const atLimit = chatbots.length >= PLANS[plan].chatbotLimit;
   const limitMessage = atLimit ? getChatbotLimitMessage(plan) : undefined;
+
+  console.info(AUTH_DEBUG_TAG, {
+    stage: "dashboard_data_ready",
+    pathname: "/dashboard",
+    userId,
+    chatbotRowCount: chatbots.length,
+    profilePlan: plan,
+  });
 
   return (
     <div className="mx-auto max-w-6xl">
