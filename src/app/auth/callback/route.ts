@@ -10,22 +10,34 @@ function getLoginErrorRedirect(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
-
-  if (!code) {
-    return NextResponse.redirect(getLoginErrorRedirect(request));
-  }
+  const flowId = request.nextUrl.searchParams.get("sb_flow_id");
 
   const supabase = await createClient();
 
-  try {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (code) {
+    try {
+      const { error } = await supabase.auth.exchangeCodeForSession(
+        code,
+        flowId ? { flowId } : undefined,
+      );
 
-    if (error) {
-      return NextResponse.redirect(getLoginErrorRedirect(request));
+      if (!error) {
+        return NextResponse.redirect(new URL("/dashboard", request.url));
+      }
+    } catch {
+      // Fall through and accept only an independently verified existing session.
     }
-  } catch {
-    return NextResponse.redirect(getLoginErrorRedirect(request));
   }
 
-  return NextResponse.redirect(new URL("/dashboard", request.url));
+  try {
+    const { data, error } = await supabase.auth.getClaims();
+
+    if (!error && data?.claims?.sub) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+  } catch {
+    // Missing or invalid sessions use the same safe login error below.
+  }
+
+  return NextResponse.redirect(getLoginErrorRedirect(request));
 }
