@@ -55,24 +55,6 @@ export default async function DashboardPage({
     !profileResult.data ||
     !isPlan(profileResult.data.plan)
   ) {
-    const { data: sessionData, error: sessionError } =
-      await supabase.auth.getSession();
-
-    console.error("[dashboard-plan]", {
-      operation: "select_current_profile_plan",
-      authUserExists: Boolean(userId),
-      userId,
-      authRole: authData?.claims?.role ?? null,
-      sessionExists: Boolean(sessionData.session),
-      sessionErrorCode: sessionError?.code ?? null,
-      sessionErrorMessage: sessionError?.message ?? null,
-      profileRowReturned: Boolean(profileResult.data),
-      profileErrorCode: profileResult.error?.code ?? null,
-      profileErrorMessage: profileResult.error?.message ?? null,
-      profileErrorDetails: profileResult.error?.details ?? null,
-      profileErrorHint: profileResult.error?.hint ?? null,
-    });
-
     throw new Error("Unable to load the current plan.");
   }
 
